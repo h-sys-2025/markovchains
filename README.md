@@ -1,7 +1,7 @@
 # markovchains in v.
 - A simple lib to make and experiment with markov chains, all in v, minimal+lightweight.
 
-![0.29](https://img.shields.io/badge/version-0.29-white?style=flat)
+![0.2](https://img.shields.io/badge/version-0.2-white?style=flat)
 ![GitHub](https://img.shields.io/badge/license-MIT-blue?style=flat)
 ![vlang](http://img.shields.io/badge/V-0.5+-%236d8fc5?style=flat)
 
@@ -14,7 +14,7 @@ v install h-sys-2025.vmarkov
 ```v
 module main
 
-import markovchains as markov
+import h_sys_2025.vmarkov.markovchains as markov
 
 fn main() {
     text := "hello world this is a test hello again world"
