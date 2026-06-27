@@ -12,7 +12,7 @@ fn main() {
 
   result := m.generate_text("hello world", markov.GenConfig{
     max_tokens:  40
-    temperature: 0.8    // 0.5 focused · 1.0 normal · 1.5 creative
+    temperature: 0.5    // 0.5 focused · 1.0 normal · 1.5 creative
     top_k_n:     10     // only sample from top-10 tokens
     top_p_val:   0.9    // or: nucleus sampling (pick one or combine)
     stop_token:  "."    // stop at first full stop
@@ -24,13 +24,13 @@ fn main() {
   for p in preds { println(p) }             // prints: "brown" (0.4123) etc.
 
   p := m.prob(["hello"], "world")
-  println("P(world | hello) = ${p:.4f}")
+  println("P(world | hello) = ${p}")
 
   start := m.random_start()
-  println(m.complete(start.join(" "), 20))
+  println(m.complete(start.join(" "), 30))
 
   char_m := markov.from_file_chars("./raw_data.txt", markov.cfg_order(3)) or { panic(err) }
-  println(char_m.generate_chars("ma", markov.GenConfig{ max_tokens: 10 }))
+  println(char_m.generate_chars("big ", markov.GenConfig{ max_tokens: 6 }))
 
   dna_tokens := markov.split_by("ATG CGT ATG AAA CGT TTT ATG CGT AAA", " ")
   dna_m := markov.from_tokens(dna_tokens, markov.cfg_order(1))
