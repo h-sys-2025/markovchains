@@ -278,15 +278,20 @@ fn join_ctx(tokens []string) string {
 // probs_for returns the probability distribution for a context slice,
 // with automatic back-off to shorter contexts when there's no match.
 fn (m Markov) probs_for(ctx_tokens []string) map[string]f64 {
-	for ctx_len := ctx_tokens.len; ctx_len >= 1; ctx_len-- {
-		slice := ctx_tokens[ctx_tokens.len - ctx_len..].filter(it.len > 0)
-		if slice.len == 0 { continue }
-		key := join_ctx(slice)
-		if key in m.model {
-			return m.model[key].clone()
-		}
-	}
-	return map[string]f64{}
+    if ctx_tokens.len == 0 {
+        return map[string]f64{}
+    }
+    for ctx_len := ctx_tokens.len; ctx_len >= 1; ctx_len-- {
+        slice := ctx_tokens[ctx_tokens.len - ctx_len..].filter(it.len > 0 && it != '<start>')
+        if slice.len == 0 {
+            continue
+        }
+        key := join_ctx(slice)
+        if key in m.model {
+            return m.model[key].clone()
+        }
+    }
+    return map[string]f64{}
 }
 
 // =============================================================================
@@ -385,15 +390,18 @@ pub fn (m Markov) next(seed string) string {
 
 // next_n returns n independently sampled next tokens (not a chain).
 pub fn (m Markov) next_n(seed string, n int) []string {
-	ctx := words(seed)
-	probs := m.probs_for(ctx)
-	mut out := []string{}
-	for _ in 0 .. n {
-		out << sample_from(probs, 1.0)
-	}
-	return out
+    ctx := words(seed)
+    probs := m.probs_for(ctx)
+    mut out := []string{}
+    for _ in 0 .. n {
+        if probs.len == 0 {
+            out << ''
+        } else {
+            out << sample_from(probs, 1.0)
+        }
+    }
+    return out
 }
-
 // complete generates up to max_tokens tokens after seed and returns the
 // full string (seed + generated), with punctuation re-attached.
 pub fn (m Markov) complete(seed string, max_tokens int) string {
@@ -413,52 +421,75 @@ pub fn (m Markov) walk(seed []string, steps int) []string {
 
 pub struct GenConfig {
 pub:
-	max_tokens  int  = 100
-	temperature f64  = 1.0
-	back_off    bool = true
-	// top_k_n: if > 0, apply top-k filtering before sampling
-	top_k_n int = 0
-	// top_p_val: if > 0, apply nucleus (top-p) filtering before sampling
-	top_p_val f64 = 0.0
-	// stop_token: generation stops when this token is produced (e.g. ".")
-	stop_token string = ''
+    max_tokens  int   = 100
+    temperature f64   = 1.0
+    back_off    bool  = true
+    top_k_n     int   = 0
+    top_p_val   f64   = 0.0
+    stop_token  string = ''
 }
 
 // generate returns a []string of generated tokens starting from seed tokens.
 pub fn (m Markov) generate(seed []string, gcfg GenConfig) []string {
-	order := m.cfg.order
-	mut history := seed.clone()
-	for history.len < order { history.insert(0, '') }
+    order := m.cfg.order
+    mut history := seed.clone()
 
-	mut output := []string{}
-	for _ in 0 .. gcfg.max_tokens {
-		mut probs := map[string]f64{}
+    // Better padding: only pad if needed, and use a special start token or truncate
+    for history.len < order {
+        history.insert(0, '<start>')
+    }
 
-		if gcfg.back_off {
-			probs = m.probs_for(history[history.len - order..])
-		} else {
-			slice := history[history.len - order..].filter(it.len > 0)
-			key := join_ctx(slice)
-			if key in m.model { probs = m.model[key].clone() }
-		}
+    mut output := []string{}
 
-		if probs.len == 0 { break }
+    for _ in 0 .. gcfg.max_tokens {
+        mut ctx_slice := history[history.len - order..].clone()
 
-		// Optional filtering
-		mut filtered := probs.clone()
-		if gcfg.top_k_n > 0   { filtered = top_k(filtered, gcfg.top_k_n) }
-		if gcfg.top_p_val > 0  { filtered = top_p(filtered, gcfg.top_p_val) }
+        // Remove padding tokens for lookup
+        ctx_slice = ctx_slice.filter(it != '<start>' && it.len > 0)
 
-		picked := sample_from(filtered, gcfg.temperature)
-		if picked == '' { break }
+        mut probs := map[string]f64{}
+        if gcfg.back_off {
+            probs = m.probs_for(ctx_slice)
+        } else if ctx_slice.len == order {
+            key := join_ctx(ctx_slice)
+            if key in m.model {
+                probs = m.model[key].clone()
+            }
+        }
 
-		output << picked
-		history << picked
+        if probs.len == 0 {
+            // Try shorter context
+            if ctx_slice.len > 1 {
+                probs = m.probs_for(ctx_slice[1..])
+            }
+            if probs.len == 0 {
+                break
+            }
+        }
 
-		if gcfg.stop_token != '' && picked == gcfg.stop_token { break }
-	}
-	return output
-}
+        mut filtered := probs.clone()
+        if gcfg.top_k_n > 0 {
+            filtered = top_k(filtered, gcfg.top_k_n)
+        }
+        if gcfg.top_p_val > 0 {
+            filtered = top_p(filtered, gcfg.top_p_val)
+        }
+
+        picked := sample_from(filtered, gcfg.temperature)
+        if picked == '' || picked == '<start>' {
+            break
+        }
+
+        output << picked
+        history << picked
+
+        if gcfg.stop_token != '' && picked == gcfg.stop_token {
+            break
+        }
+    }
+
+    return output
+}}
 
 // generate_text tokenizes seed_text, generates, then re-joins into a string.
 pub fn (m Markov) generate_text(seed_text string, gcfg GenConfig) string {
@@ -528,11 +559,15 @@ pub fn (m Markov) knows(ctx_tokens []string) bool {
 // random_start returns a random starting context from the model.
 // Useful when you don't have a seed.
 pub fn (m Markov) random_start() []string {
-	keys := m.model.keys()
-	if keys.len == 0 { return [] }
-	key := keys[rand.intn(keys.len) or { 0 }]
-	return key.split(markovchains.sep)
-}
+    keys := m.model.keys()
+    if keys.len == 0 {
+        return []string{}
+    }
+    key := keys[rand.intn(keys.len) or { 0 }]
+    mut parts := key.split(markovchains.sep)
+    // Filter out any empty parts
+    return parts.filter(it.len > 0)
+}}
 
 // =============================================================================
 // Prediction struct
