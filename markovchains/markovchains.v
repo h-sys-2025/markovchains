@@ -580,26 +580,49 @@ pub fn (m Markov) stats() string {
 
 // perplexity estimates model quality on a test string (lower = better fit).
 // Returns 0 if the string can"t be evaluated.
+// perplexity estimates model quality on a test string (lower = better fit).
+// Returns a high value (like 1e6) if the text is completely unknown.
 pub fn (m Markov) perplexity(test_text string) f64 {
-	toks := words(test_text)
-	order := m.cfg.order
-	if toks.len <= order { return 0.0 }
+    toks := words(test_text)
+    order := m.cfg.order
 
-	mut log_sum := 0.0
-	mut count := 0
-	for i in 0 .. toks.len - order {
-		ctx := toks[i..i + order]
-		nxt := toks[i + order]
-		p := m.prob(ctx, nxt)
-		if p > 0.0 {
-			log_sum += math.log2(p)
-			count++
-		}
-	}
-	if count == 0 { return 0.0 }
-	return math.pow(2.0, -log_sum / f64(count))
+    if toks.len <= order {
+        return 0.0 // too short to evaluate
+    }
+
+    mut log_sum := 0.0
+    mut count := 0
+    mut unseen := 0
+
+    for i in 0 .. toks.len - order {
+        ctx := toks[i..i + order]
+        nxt := toks[i + order]
+        p := m.prob(ctx, nxt)
+
+        if p > 0.0 {
+            log_sum += math.log2(p)
+            count++
+        } else {
+            unseen++
+        }
+    }
+
+    if count == 0 {
+        return 1e6 // very high value meaning "completely unknown"
+    }
+
+    // Use only the tokens we could predict
+    avg_log_prob := log_sum / f64(count)
+    perplexity := math.pow(2.0, -avg_log_prob)
+
+    // Optional: add a small penalty based on unseen n-grams
+    if unseen > 0 {
+        penalty := 1.0 + f64(unseen) / f64(toks.len)
+        return perplexity * penalty
+    }
+
+    return perplexity
 }
-
 // =============================================================================
 // Save / Load
 // =============================================================================
