@@ -623,6 +623,55 @@ pub fn (m Markov) perplexity(test_text string) f64 {
 
     return perplexity
 }
+pub fn (m Markov) perplexity_report(test_text string) string {
+    toks := words(test_text)
+    order := m.cfg.order
+
+    if toks.len <= order {
+        return 'Text too short to evaluate (need at least ${order + 1} tokens)'
+    }
+
+    mut log_sum := 0.0
+    mut count := 0
+    mut unseen_count := 0
+    mut unseen_examples := []string{}
+
+    for i in 0 .. toks.len - order {
+        ctx := toks[i..i + order]
+        nxt := toks[i + order]
+        p := m.prob(ctx, nxt)
+
+        if p > 0.0 {
+            log_sum += math.log2(p)
+            count++
+        } else {
+            unseen_count++
+            if unseen_examples.len < 3 {
+                unseen_examples << '${ctx} → ${nxt}'
+            }
+        }
+    }
+
+    if count == 0 {
+        return 'Perplexity: ∞ (model has never seen any of these n-grams)'
+    }
+
+    ppl := math.pow(2.0, -log_sum / f64(count))
+
+    mut report := 'Perplexity: ${ppl:.2f}\n'
+    report += 'Predicted tokens: ${count}/${toks.len - order}\n'
+    report += 'Unseen n-grams: ${unseen_count}\n'
+
+    if unseen_examples.len > 0 {
+        report += 'Examples of unseen transitions:\n'
+        for ex in unseen_examples {
+            report += '  ${ex}\n'
+        }
+    }
+
+    return report
+}
+
 // =============================================================================
 // Save / Load
 // =============================================================================
