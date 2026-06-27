@@ -13,7 +13,7 @@ module markovchains
 import os
 import math
 import rand
-//import x.json2
+import x.json2
 
 // sep is the internal key separator.  Pipe is human-readable in JSON
 // and stripped from text input by the tokenizer so it never collides.
