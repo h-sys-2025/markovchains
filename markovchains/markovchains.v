@@ -13,7 +13,7 @@ module markovchains
 import os
 import math
 import rand
-import x.json2
+//import x.json2
 
 // sep is the internal key separator.  Pipe is human-readable in JSON
 // and stripped from text input by the tokenizer so it never collides.
@@ -489,7 +489,7 @@ pub fn (m Markov) generate(seed []string, gcfg GenConfig) []string {
     }
 
     return output
-}}
+}
 
 // generate_text tokenizes seed_text, generates, then re-joins into a string.
 pub fn (m Markov) generate_text(seed_text string, gcfg GenConfig) string {
