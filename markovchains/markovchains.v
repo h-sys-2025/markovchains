@@ -4,9 +4,9 @@
 // log lines, or any []string you feed it.
 //
 // Quick-start:
-//   m := markov.from_text('your corpus here', markov.cfg())
-//   println(m.next('hello'))           // single next token
-//   println(m.complete('hello', 20))   // full generated string
+//   m := markov.from_text("your corpus here", markov.cfg())
+//   println(m.next("hello"))           // single next token
+//   println(m.complete("hello", 20))   // full generated string
 //
 module markovchains
 
@@ -17,7 +17,7 @@ import x.json2
 
 // sep is the internal key separator.  Pipe is human-readable in JSON
 // and stripped from text input by the tokenizer so it never collides.
-const sep = '|'
+const sep = "|"
 
 // =============================================================================
 // Tokenizers — convert raw input into []string tokens
@@ -26,13 +26,13 @@ const sep = '|'
 // words  — default text tokenizer.
 // Lowercases, keeps punctuation as separate tokens.
 pub fn words(raw string) []string {
-	punct := '.,!?;:\'"()-[]{}…|/\\@#$%^&*+=<>~`'.split('')
-	mut s := raw.replace('\r\n', ' ').replace('\n', ' ').replace('\t', ' ')
+	punct := ".,!?;:\"()-[]{}…|/\\@#$%^&*+=<>~`".split("")
+	mut s := raw.replace("\r\n", " ").replace("\n", " ").replace("\t", " ")
 	for p in punct {
-		s = s.replace(p, ' ${p} ')
+		s = s.replace(p, " ${p} ")
 	}
 	mut out := []string{}
-	for part in s.split(' ') {
+	for part in s.split(" ") {
 		t := part.trim_space().to_lower()
 		if t.len > 0 {
 			out << t
@@ -47,7 +47,7 @@ pub fn chars(raw string) []string {
 	mut out := []string{}
 	for ch in raw.runes() {
 		s := ch.str()
-		if s != ' ' && s != '\n' && s != '\r' && s != '\t' {
+		if s != " " && s != "\n" && s != "\r" && s != "\t" {
 			out << s.to_lower()
 		}
 	}
@@ -58,7 +58,7 @@ pub fn chars(raw string) []string {
 // Good for modelling sequences of log lines, sentences, moves, etc.
 pub fn lines(raw string) []string {
 	mut out := []string{}
-	for line in raw.split('\n') {
+	for line in raw.split("\n") {
 		t := line.trim_space()
 		if t.len > 0 {
 			out << t
@@ -68,8 +68,8 @@ pub fn lines(raw string) []string {
 }
 
 // split_by — tokenize by any custom delimiter.
-// e.g. split_by('C,G,A,T,G', ',')  for DNA
-//      split_by('60 62 64 65', ' ') for MIDI notes
+// e.g. split_by("C,G,A,T,G", ",")  for DNA
+//      split_by("60 62 64 65", " ") for MIDI notes
 pub fn split_by(raw string, delimiter string) []string {
 	mut out := []string{}
 	for part in raw.split(delimiter) {
@@ -187,13 +187,13 @@ pub fn from_lines(text string, c Config) Markov {
 
 // from_file reads a corpus file and trains with the words() tokenizer.
 pub fn from_file(path string, c Config) !Markov {
-	raw := os.read_file(path) or { return error('cannot read "${path}": ${err}') }
+	raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
 	return from_text(raw, c)
 }
 
 // from_file_chars reads a corpus file and trains a char-level model.
 pub fn from_file_chars(path string, c Config) !Markov {
-	raw := os.read_file(path) or { return error('cannot read "${path}": ${err}') }
+	raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
 	return from_chars(raw, c)
 }
 
@@ -201,7 +201,7 @@ pub fn from_file_chars(path string, c Config) !Markov {
 pub fn from_files(paths []string, c Config) !Markov {
 	mut all_tokens := []string{}
 	for path in paths {
-		raw := os.read_file(path) or { return error('cannot read "${path}": ${err}') }
+		raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
 		all_tokens << words(raw)
 	}
 	return from_tokens(all_tokens, c)
@@ -258,7 +258,7 @@ pub fn (m Markov) train_more(text string) Markov {
 
 // train_more_file adds a new corpus file to an existing model.
 pub fn (m Markov) train_more_file(path string) !Markov {
-	raw := os.read_file(path) or { return error('cannot read "${path}": ${err}') }
+	raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
 	return m.train_more(raw)
 }
 
@@ -267,7 +267,7 @@ pub fn (m Markov) train_more_file(path string) !Markov {
 // =============================================================================
 
 fn join_ctx(tokens []string) string {
-	mut s := ''
+	mut s := ""
 	for i, t in tokens {
 		if i > 0 { s += markovchains.sep }
 		s += t
@@ -276,13 +276,13 @@ fn join_ctx(tokens []string) string {
 }
 
 // probs_for returns the probability distribution for a context slice,
-// with automatic back-off to shorter contexts when there's no match.
+// with automatic back-off to shorter contexts when there"s no match.
 fn (m Markov) probs_for(ctx_tokens []string) map[string]f64 {
     if ctx_tokens.len == 0 {
         return map[string]f64{}
     }
     for ctx_len := ctx_tokens.len; ctx_len >= 1; ctx_len-- {
-        slice := ctx_tokens[ctx_tokens.len - ctx_len..].filter(it.len > 0 && it != '<start>')
+        slice := ctx_tokens[ctx_tokens.len - ctx_len..].filter(it.len > 0 && it != "<start>")
         if slice.len == 0 {
             continue
         }
@@ -301,7 +301,7 @@ fn (m Markov) probs_for(ctx_tokens []string) map[string]f64 {
 // sample_from picks one token from a probability map using temperature scaling.
 //   temperature 1.0 → unchanged  |  < 1.0 → sharper  |  > 1.0 → more random
 pub fn sample_from(probs map[string]f64, temperature f64) string {
-	if probs.len == 0 { return '' }
+	if probs.len == 0 { return "" }
 	temp := if temperature <= 0.0 { 1e-9 } else { temperature }
 
 	mut scaled := map[string]f64{}
@@ -322,7 +322,7 @@ pub fn sample_from(probs map[string]f64, temperature f64) string {
 	}
 
 	// fallback: argmax
-	mut best := ''
+	mut best := ""
 	mut best_p := -1.0
 	for tok, prob in probs {
 		if prob > best_p { best_p = prob; best = tok }
@@ -395,7 +395,7 @@ pub fn (m Markov) next_n(seed string, n int) []string {
     mut out := []string{}
     for _ in 0 .. n {
         if probs.len == 0 {
-            out << ''
+            out << ""
         } else {
             out << sample_from(probs, 1.0)
         }
@@ -426,7 +426,7 @@ pub:
     back_off    bool  = true
     top_k_n     int   = 0
     top_p_val   f64   = 0.0
-    stop_token  string = ''
+    stop_token  string = ""
 }
 
 // generate returns a []string of generated tokens starting from seed tokens.
@@ -436,7 +436,7 @@ pub fn (m Markov) generate(seed []string, gcfg GenConfig) []string {
 
     // Better padding: only pad if needed, and use a special start token or truncate
     for history.len < order {
-        history.insert(0, '<start>')
+        history.insert(0, "<start>")
     }
 
     mut output := []string{}
@@ -445,7 +445,7 @@ pub fn (m Markov) generate(seed []string, gcfg GenConfig) []string {
         mut ctx_slice := history[history.len - order..].clone()
 
         // Remove padding tokens for lookup
-        ctx_slice = ctx_slice.filter(it != '<start>' && it.len > 0)
+        ctx_slice = ctx_slice.filter(it != "<start>" && it.len > 0)
 
         mut probs := map[string]f64{}
         if gcfg.back_off {
@@ -476,14 +476,14 @@ pub fn (m Markov) generate(seed []string, gcfg GenConfig) []string {
         }
 
         picked := sample_from(filtered, gcfg.temperature)
-        if picked == '' || picked == '<start>' {
+        if picked == "" || picked == "<start>" {
             break
         }
 
         output << picked
         history << picked
 
-        if gcfg.stop_token != '' && picked == gcfg.stop_token {
+        if gcfg.stop_token != "" && picked == gcfg.stop_token {
             break
         }
     }
@@ -502,7 +502,7 @@ pub fn (m Markov) generate_text(seed_text string, gcfg GenConfig) string {
 pub fn (m Markov) generate_chars(seed_text string, gcfg GenConfig) string {
 	seed := chars(seed_text)
 	tokens := m.generate(seed, gcfg)
-	return seed.join('') + tokens.join('')
+	return seed.join("") + tokens.join("")
 }
 
 // generate_seq generates from arbitrary token sequences (DNA, music, etc.).
@@ -512,13 +512,13 @@ pub fn (m Markov) generate_seq(seed []string, gcfg GenConfig) []string {
 
 // pretty_join re-attaches punctuation and capitalises the first letter.
 fn pretty_join(seed []string, generated []string) string {
-	punct_set := '.,!?;:\'"…'.split('')
-	mut result := seed.join(' ')
+	punct_set := ".,!?;:\"…".split("")
+	mut result := seed.join(" ")
 	for tok in generated {
 		if tok in punct_set {
 			result += tok
 		} else {
-			result += ' ' + tok
+			result += " " + tok
 		}
 	}
 	return result.trim_space()
@@ -557,7 +557,7 @@ pub fn (m Markov) knows(ctx_tokens []string) bool {
 }
 
 // random_start returns a random starting context from the model.
-// Useful when you don't have a seed.
+// Useful when you don"t have a seed.
 pub fn (m Markov) random_start() []string {
     keys := m.model.keys()
     if keys.len == 0 {
@@ -580,7 +580,7 @@ pub:
 }
 
 pub fn (p Prediction) str() string {
-	return '"${p.token}" (${p.prob:.4f})'
+	return "\"${p.token}\" (${p.prob:.4f})"
 }
 
 struct Pair {
@@ -593,12 +593,12 @@ struct Pair {
 // =============================================================================
 
 pub fn (m Markov) stats() string {
-	return 'Markov(order=${m.cfg.order}, smoothing=${m.cfg.smoothing}, ' +
-		'contexts=${m.model.len}, vocab=${m.vocab}, tok_count=${m.tok_count})'
+	return "Markov(order=${m.cfg.order}, smoothing=${m.cfg.smoothing}, " +
+		"contexts=${m.model.len}, vocab=${m.vocab}, tok_count=${m.tok_count})"
 }
 
 // perplexity estimates model quality on a test string (lower = better fit).
-// Returns 0 if the string can't be evaluated.
+// Returns 0 if the string can"t be evaluated.
 pub fn (m Markov) perplexity(test_text string) f64 {
 	toks := words(test_text)
 	order := m.cfg.order
@@ -625,10 +625,10 @@ pub fn (m Markov) perplexity(test_text string) f64 {
 
 pub fn (m Markov) save(path string) ! {
 	mut root := map[string]json2.Any{}
-	root['order']     = json2.Any(m.cfg.order)
-	root['smoothing'] = json2.Any(m.cfg.smoothing)
-	root['tok_count'] = json2.Any(m.tok_count)
-	root['vocab']     = json2.Any(m.vocab)
+	root["order"]     = json2.Any(m.cfg.order)
+	root["smoothing"] = json2.Any(m.cfg.smoothing)
+	root["tok_count"] = json2.Any(m.tok_count)
+	root["vocab"]     = json2.Any(m.vocab)
 
 	mut transitions := map[string]json2.Any{}
 	for ctx, next_map in m.model {
@@ -636,7 +636,7 @@ pub fn (m Markov) save(path string) ! {
 		for nxt, prob in next_map { inner[nxt] = json2.Any(prob) }
 		transitions[ctx] = json2.Any(inner)
 	}
-	root['transitions'] = json2.Any(transitions)
+	root["transitions"] = json2.Any(transitions)
 
 	os.write_file(path, json2.encode(root, prettify: true))!
 }
@@ -644,17 +644,17 @@ pub fn (m Markov) save(path string) ! {
 pub fn load(path string) !Markov {
 	json_text := os.read_file(path)!
 	root_any  := json2.decode[json2.Any](json_text) or {
-		return error('failed to decode JSON: ${err}')
+		return error("failed to decode JSON: ${err}")
 	}
 	root := root_any.as_map()
 
 	c := Config{
-		order:     int(root['order'] or { json2.Any(2) }.int())
-		smoothing: root['smoothing'] or { json2.Any(0.01) }.f64()
+		order:     int(root["order"] or { json2.Any(2) }.int())
+		smoothing: root["smoothing"] or { json2.Any(0.01) }.f64()
 	}
 
 	mut model := map[string]map[string]f64{}
-	transitions_any := root['transitions'] or { json2.Any(map[string]json2.Any{}) }
+	transitions_any := root["transitions"] or { json2.Any(map[string]json2.Any{}) }
 	for ctx, val in transitions_any.as_map() {
 		mut inner := map[string]f64{}
 		for nxt, prob_any in val.as_map() { inner[nxt] = prob_any.f64() }
@@ -664,7 +664,7 @@ pub fn load(path string) !Markov {
 	return Markov{
 		model:     model
 		cfg:       c
-		tok_count: int(root['tok_count'] or { json2.Any(0) }.int())
-		vocab:     int(root['vocab'] or { json2.Any(0) }.int())
+		tok_count: int(root["tok_count"] or { json2.Any(0) }.int())
+		vocab:     int(root["vocab"] or { json2.Any(0) }.int())
 	}
 }
