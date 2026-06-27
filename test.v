@@ -6,25 +6,25 @@ fn main() {
   m := markov.from_file("./raw_data.txt", markov.cfg()) or { panic(err) }
   println(m.stats())
 
-  println(m.next("the quick"))              // single next token
-  println(m.next_n("the", 5))              // 5 independent next tokens
-  println(m.complete("the quick brown", 30)) // seed + 30 generated tokens
+  println(m.next("WAR IS"))              // single next token
+  println(m.next_n("IGNORANCE", 5))              // 5 independent next tokens
+  println(m.complete("The Ministry of Truth", 30)) // seed + 30 generated tokens
 
   result := m.generate_text("hello world", markov.GenConfig{
     max_tokens:  40
     temperature: 0.5    // 0.5 focused · 1.0 normal · 1.5 creative
-    top_k_n:     10     // only sample from top-10 tokens
+    top_k_n:     5     // only sample from top-10 tokens
     top_p_val:   0.9    // or: nucleus sampling (pick one or combine)
     stop_token:  "."    // stop at first full stop
     back_off:    true
   })
   println(result)
 
-  preds := m.top(["the", "quick"], 5)
+  preds := m.top(["WAR", "IS"], 5)
   for p in preds { println(p) }             // prints: "brown" (0.4123) etc.
 
-  p := m.prob(["hello"], "world")
-  println("P(world | hello) = ${p}")
+  p := m.prob(["IS"], "STRENGHT")
+  println("P(IS | STRENGHT) = ${p}")
 
   start := m.random_start()
   println(m.complete(start.join(" "), 30))
