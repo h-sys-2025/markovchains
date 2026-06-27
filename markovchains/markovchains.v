@@ -187,13 +187,13 @@ pub fn from_lines(text string, c Config) Markov {
 
 // from_file reads a corpus file and trains with the words() tokenizer.
 pub fn from_file(path string, c Config) !Markov {
-	raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
+	raw := os.read_file(path) or { return error("cannot read '${path}': ${err}") }
 	return from_text(raw, c)
 }
 
 // from_file_chars reads a corpus file and trains a char-level model.
 pub fn from_file_chars(path string, c Config) !Markov {
-	raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
+	raw := os.read_file(path) or { return error("cannot read '${path}': ${err}") }
 	return from_chars(raw, c)
 }
 
@@ -201,7 +201,7 @@ pub fn from_file_chars(path string, c Config) !Markov {
 pub fn from_files(paths []string, c Config) !Markov {
 	mut all_tokens := []string{}
 	for path in paths {
-		raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
+		raw := os.read_file(path) or { return error("cannot read '${path}': ${err}") }
 		all_tokens << words(raw)
 	}
 	return from_tokens(all_tokens, c)
@@ -258,7 +258,7 @@ pub fn (m Markov) train_more(text string) Markov {
 
 // train_more_file adds a new corpus file to an existing model.
 pub fn (m Markov) train_more_file(path string) !Markov {
-	raw := os.read_file(path) or { return error("cannot read \"${path)\": ${err}") }
+	raw := os.read_file(path) or { return error("cannot read '${path}': ${err}") }
 	return m.train_more(raw)
 }
 
