@@ -567,7 +567,7 @@ pub fn (m Markov) random_start() []string {
     mut parts := key.split(markovchains.sep)
     // Filter out any empty parts
     return parts.filter(it.len > 0)
-}}
+}
 
 // =============================================================================
 // Prediction struct
