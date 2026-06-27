@@ -282,7 +282,7 @@ fn (m Markov) probs_for(ctx_tokens []string) map[string]f64 {
         return map[string]f64{}
     }
     for ctx_len := ctx_tokens.len; ctx_len >= 1; ctx_len-- {
-        slice := ctx_tokens[ctx_tokens.len - ctx_len..].filter(it.len > 0 && it != "<start>")
+        slice := ctx_tokens[ctx_tokens.len - ctx_len..].filter(it.len > 0)
         if slice.len == 0 {
             continue
         }
@@ -394,14 +394,11 @@ pub fn (m Markov) next_n(seed string, n int) []string {
     probs := m.probs_for(ctx)
     mut out := []string{}
     for _ in 0 .. n {
-        if probs.len == 0 {
-            out << ""
-        } else {
-            out << sample_from(probs, 1.0)
-        }
+        out << sample_from(probs, 1.0)
     }
     return out
 }
+
 // complete generates up to max_tokens tokens after seed and returns the
 // full string (seed + generated), with punctuation re-attached.
 pub fn (m Markov) complete(seed string, max_tokens int) string {
@@ -424,9 +421,9 @@ pub:
     max_tokens  int   = 100
     temperature f64   = 1.0
     back_off    bool  = true
-    top_k_n     int   = 0
-    top_p_val   f64   = 0.0
-    stop_token  string = ""
+    top_k_n     int
+    top_p_val   f64
+    stop_token  string
 }
 
 // generate returns a []string of generated tokens starting from seed tokens.
@@ -434,51 +431,36 @@ pub fn (m Markov) generate(seed []string, gcfg GenConfig) []string {
     order := m.cfg.order
     mut history := seed.clone()
 
-    // Better padding: only pad if needed, and use a special start token or truncate
-    for history.len < order {
-        history.insert(0, "<start>")
+    // Improved: don't use magic token if we can avoid it
+    if history.len < order {
+        for history.len < order {
+            history.insert(0, "")  // empty is safer than <start>
+        }
     }
 
     mut output := []string{}
 
     for _ in 0 .. gcfg.max_tokens {
+        // Take last 'order' tokens, filtering empties for lookup
         mut ctx_slice := history[history.len - order..].clone()
+        ctx_slice = ctx_slice.filter(it.len > 0)
 
-        // Remove padding tokens for lookup
-        ctx_slice = ctx_slice.filter(it != "<start>" && it.len > 0)
+        mut probs := m.probs_for(ctx_slice)
 
-        mut probs := map[string]f64{}
-        if gcfg.back_off {
-            probs = m.probs_for(ctx_slice)
-        } else if ctx_slice.len == order {
-            key := join_ctx(ctx_slice)
-            if key in m.model {
-                probs = m.model[key].clone()
-            }
+        if probs.len == 0 && ctx_slice.len > 1 {
+            probs = m.probs_for(ctx_slice[1..])  // backoff
         }
 
         if probs.len == 0 {
-            // Try shorter context
-            if ctx_slice.len > 1 {
-                probs = m.probs_for(ctx_slice[1..])
-            }
-            if probs.len == 0 {
-                break
-            }
+            break
         }
 
         mut filtered := probs.clone()
-        if gcfg.top_k_n > 0 {
-            filtered = top_k(filtered, gcfg.top_k_n)
-        }
-        if gcfg.top_p_val > 0 {
-            filtered = top_p(filtered, gcfg.top_p_val)
-        }
+        if gcfg.top_k_n > 0 { filtered = top_k(filtered, gcfg.top_k_n) }
+        if gcfg.top_p_val > 0 { filtered = top_p(filtered, gcfg.top_p_val) }
 
         picked := sample_from(filtered, gcfg.temperature)
-        if picked == "" || picked == "<start>" {
-            break
-        }
+        if picked == "" { break }
 
         output << picked
         history << picked
@@ -487,7 +469,6 @@ pub fn (m Markov) generate(seed []string, gcfg GenConfig) []string {
             break
         }
     }
-
     return output
 }
 
